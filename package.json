@@ -1,0 +1,13 @@
+{
+  "name": "realsense-bridge-server",
+  "version": "1.0.0",
+  "description": "Node.js bridge for RealSense-to-Unity 3D streaming over WebSockets",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  }
+}
