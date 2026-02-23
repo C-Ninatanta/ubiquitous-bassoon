@@ -4,28 +4,6 @@
 // - Unity connects to ws://HOST/ws/unity and RECEIVES frames.
 // Node does not interpret the payload: it just relays it.
 
-// Add near the top
-const MAX_BUFFERED_BYTES = 2 * 1024 * 1024; // 2 MB, tune as needed
-
-rsWss.on('connection', (ws) => {
-  console.log('RealSense producer connected');
-
-  ws.on('message', (data, isBinary) => {
-    for (const client of unityClients) {
-      if (client.readyState !== WebSocket.OPEN) continue;
-
-      // If client is behind, drop frames for that client to prevent latency buildup
-      if (client.bufferedAmount > MAX_BUFFERED_BYTES) {
-        continue;
-      }
-
-      client.send(data, { binary: isBinary });
-    }
-  });
-
-  ws.on('close', () => console.log('RealSense producer disconnected'));
-});
-
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
@@ -52,16 +30,25 @@ const unityWss = new WebSocket.Server({ noServer: true });
 
 const unityClients = new Set();
 
+// Drop policy: if a client is lagging, don't enqueue more data for it
+const MAX_BUFFERED_BYTES = 2 * 1024 * 1024; // 2 MB (tune)
+
 // When Python/RealSense connects
 rsWss.on('connection', (ws) => {
   console.log('RealSense producer connected');
 
   ws.on('message', (data, isBinary) => {
-    // Relay this message as-is to all Unity clients
     for (const client of unityClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(data, { binary: isBinary });
+      if (client.readyState !== WebSocket.OPEN) continue;
+
+      // If client is behind, drop frames for that client to prevent latency buildup
+      if (client.bufferedAmount > MAX_BUFFERED_BYTES) {
+        // Optional: uncomment for debugging (can be noisy)
+        // console.log("Dropping frame for slow client, buffered:", client.bufferedAmount);
+        continue;
       }
+
+      client.send(data, { binary: isBinary });
     }
   });
 
