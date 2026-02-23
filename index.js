@@ -4,6 +4,28 @@
 // - Unity connects to ws://HOST/ws/unity and RECEIVES frames.
 // Node does not interpret the payload: it just relays it.
 
+// Add near the top
+const MAX_BUFFERED_BYTES = 2 * 1024 * 1024; // 2 MB, tune as needed
+
+rsWss.on('connection', (ws) => {
+  console.log('RealSense producer connected');
+
+  ws.on('message', (data, isBinary) => {
+    for (const client of unityClients) {
+      if (client.readyState !== WebSocket.OPEN) continue;
+
+      // If client is behind, drop frames for that client to prevent latency buildup
+      if (client.bufferedAmount > MAX_BUFFERED_BYTES) {
+        continue;
+      }
+
+      client.send(data, { binary: isBinary });
+    }
+  });
+
+  ws.on('close', () => console.log('RealSense producer disconnected'));
+});
+
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
